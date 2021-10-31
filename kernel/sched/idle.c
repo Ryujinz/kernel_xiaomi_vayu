@@ -246,7 +246,7 @@ static void do_idle(void)
 		check_pgt_cache();
 		rmb();
 
-		if (cpu_is_offline(smp_processor_id())) {
+		if (unlikely(cpu_is_offline(smp_processor_id()))) {
 			tick_nohz_idle_stop_tick_protected();
 			cpuhp_report_idle_dead();
 			arch_cpu_idle_dead();
@@ -261,7 +261,7 @@ static void do_idle(void)
 		 * broadcast device expired for us, we don't want to go deep
 		 * idle as we know that the IPI is going to arrive right away.
 		 */
-		if (tick_check_broadcast_expired()) {
+		if (unlikely(tick_check_broadcast_expired())) {
 			tick_nohz_idle_restart_tick();
 		} else if (cpu_idle_force_poll) {
 			cpu_idle_poll();
