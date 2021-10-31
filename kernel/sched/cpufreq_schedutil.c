@@ -985,8 +985,8 @@ static int sugov_init(struct cpufreq_policy *policy)
 		goto stop_kthread;
 	}
 
-	tunables->up_rate_limit_us = UP_RATE_LIMIT_US;
-	tunables->down_rate_limit_us = DOWN_RATE_LIMIT_US;
+	tunables->up_rate_limit_us = UP_RATE_LIMIT_US / NSEC_PER_USEC;
+	tunables->down_rate_limit_us = DOWN_RATE_LIMIT_US * NSEC_PER_USEC;
 	tunables->hispeed_load = DEFAULT_HISPEED_LOAD;
 	tunables->hispeed_freq = 0;
 
