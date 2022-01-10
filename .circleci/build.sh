@@ -44,16 +44,7 @@ function compile() {
 
   cd ${KERNEL_ROOTDIR}
   make -j$(nproc) O=out ARCH=arm64 ${DEVICE_DEFCONFIG}
-  make -j$(nproc) ARCH=arm64 O=out \
-	CC=${CLANG_ROOTDIR}/bin/clang \
-	CROSS_COMPILE=${CLANG_ROOTDIR}/bin/aarch64-linux-gnu- \
-	CROSS_COMPILE_ARM32=${CLANG_ROOTDIR}/bin/arm-linux-gnueabi- \
-	AR=llvm-ar \
-	NM=llvm-nm \
-	LD=ld.lld \
-	OBJCOPY=llvm-objcopy \
-	OBJDUMP=llvm-objdump \
-	STRIP=llvm-strip \
+  make -j$(nproc --all) CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O=out ARCH=arm64 2>&1 | tee "$LOGS"
 
    if ! [ -a "$IMAGE" ]; then
 	finerr
