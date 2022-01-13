@@ -776,7 +776,7 @@ static int sugov_init(struct cpufreq_policy *policy)
 				CONFIG_SCHEDUTIL_UP_RATE_LIMIT_LITTLE;
 		tunables->down_rate_limit_us =
 				CONFIG_SCHEDUTIL_DOWN_RATE_LIMIT_LITTLE;
-		tunables->iowait_boost_enable = false;
+		tunables->iowait_boost_enable = true;
 	}
 
 	if (cpumask_test_cpu(policy->cpu, cpu_perf_mask)) {
@@ -784,7 +784,7 @@ static int sugov_init(struct cpufreq_policy *policy)
 				CONFIG_SCHEDUTIL_UP_RATE_LIMIT_BIG;
 		tunables->down_rate_limit_us =
 				CONFIG_SCHEDUTIL_DOWN_RATE_LIMIT_BIG;
-		tunables->iowait_boost_enable = false;
+		tunables->iowait_boost_enable = true;
 	}
 
 	if (cpumask_test_cpu(policy->cpu, cpu_prime_mask)) {
@@ -792,7 +792,7 @@ static int sugov_init(struct cpufreq_policy *policy)
 				CONFIG_SCHEDUTIL_UP_RATE_LIMIT_PRIME;
 		tunables->down_rate_limit_us =
 				CONFIG_SCHEDUTIL_DOWN_RATE_LIMIT_PRIME;
-		tunables->iowait_boost_enable = false;
+		tunables->iowait_boost_enable = true;
 	}
 
 	policy->governor_data = sg_policy;
