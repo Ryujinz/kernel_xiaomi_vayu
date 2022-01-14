@@ -1,99 +1,193 @@
-#!/usr/bin/env bash
-echo "Downloading few Dependecies . . ."
-git clone --depth=1 https://github.com/Ryujinz/kernel_xiaomi_vayu Vayu
-git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
+#! /bin/bash
 
-# Main
-KERNEL_NAME=Shino # IMPORTANT ! Declare your kernel name
-KERNEL_ROOTDIR=$(pwd)/Vayu # IMPORTANT ! Fill with your kernel source root directory.
-DEVICE_CODENAME=Vayu # IMPORTANT ! Declare your device codename
-DEVICE_DEFCONFIG=vayu_defconfig # IMPORTANT ! Declare your kernel source defconfig file here.
-CLANG_ROOTDIR=$(pwd)/clang # IMPORTANT! Put your clang directory here.
-export KBUILD_BUILD_USER=renaldigp # Change with your own name or else.
-export KBUILD_BUILD_HOST=rex # Change with your own hostname.
-IMAGE=$(pwd)/Vayu/out/arch/arm64/boot/Image.gz-dtb
-DATE=$(date +"%F-%S")
-START=$(date +"%s")
-PATH="${PATH}:${CLANG_ROOTDIR}/bin"
+#
+# Script for building Android arm64 Kernel
+#
+# Copyright (c) 2021 RenaldiGP <renaldigunawan34@gmail.com>
+# Based on Panchajanya1999 script.
+#
 
-# Checking environtment
-# Warning !! Dont Change anything there without known reason.
-function check() {
-echo ================================================
-echo xKernelCompiler CircleCI Edition
-echo version : rev1.5 - gaspoll
-echo ================================================
-echo BUILDER NAME = ${KBUILD_BUILD_USER}
-echo BUILDER HOSTNAME = ${KBUILD_BUILD_HOST}
-echo DEVICE_DEFCONFIG = ${DEVICE_DEFCONFIG}
-echo CLANG_VERSION = $(${CLANG_ROOTDIR}/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g')
-echo CLANG_ROOTDIR = ${CLANG_ROOTDIR}
-echo KERNEL_ROOTDIR = ${KERNEL_ROOTDIR}
-echo ================================================
+# Function to show an informational message
+msg() {
+    echo -e "\e[1;32m$*\e[0m"
 }
 
-# Compiler
-function compile() {
-
-   # Your Telegram Group
-   curl -s -X POST "https://api.telegram.org/bot$token/sendMessage" \
-        -d chat_id="$chat_id" \
-        -d "disable_web_page_preview=true" \
-        -d "parse_mode=html" \
-        -d text="<b>xKernelCompiler</b>%0ABUILDER NAME : <code>${KBUILD_BUILD_USER}</code>%0ABUILDER HOST : <code>${KBUILD_BUILD_HOST}</code>%0ADEVICE DEFCONFIG : <code>${DEVICE_DEFCONFIG}</code>%0ACLANG VERSION : <code>$(${CLANG_ROOTDIR}/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g')</code>%0ACLANG ROOTDIR : <code>${CLANG_ROOTDIR}</code>%0AKERNEL ROOTDIR : <code>${KERNEL_ROOTDIR}</code>"
-
-  cd ${KERNEL_ROOTDIR}
-  make -j$(nproc) O=out ARCH=arm64 ${DEVICE_DEFCONFIG}
-  make -j$(nproc) ARCH=arm64 O=out \
-	CC=${CLANG_ROOTDIR}/bin/clang \
-    LD=ld.lld \
-	AR=llvm-ar \
-	NM=llvm-nm \
-	OBJCOPY=llvm-objcopy \
-	OBJDUMP=llvm-objdump \
-	STRIP=llvm-strip \
-    CLANG_TRIPLE=aarch64-linux-gnu- \
-    CROSS_COMPILE=aarch64-linux-gnu- \          
-    CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-
-   if ! [ -a "$IMAGE" ]; then
-	finerr
-	exit 1
-   fi
-    git clone --depth=1 https://github.com/Ryujinz/AnyKernel3 AnyKernel
-	cp out/arch/arm64/boot/Image.gz-dtb AnyKernel
-}
-
-# Push
-function push() {
-    cd AnyKernel
-    ZIP=$(echo *.zip)
-    curl -F document=@$ZIP "https://api.telegram.org/bot$token/sendDocument" \
-        -F chat_id="$chat_id" \
-        -F "disable_web_page_preview=true" \
-        -F "parse_mode=html" \
-        -F caption="Compile took $(($DIFF / 60)) minute(s) and $(($DIFF % 60)) second(s). | For <b>Poco X3 Pro (Vayu/Bhima)</b> | <b>$(${CLANG_ROOTDIR}/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g')</b>"
-
-}
-# Fin Error
-function finerr() {
-    curl -s -X POST "https://api.telegram.org/bot$token/sendMessage" \
-        -d chat_id="$chat_id" \
-        -d "disable_web_page_preview=true" \
-        -d "parse_mode=markdown" \
-        -d text="Build throw an error(s)"
+err() {
+    echo -e "\e[1;41m$*\e[0m"
     exit 1
 }
 
-# Zipping
-function zipping() {
-    cd AnyKernel || exit 1
-    zip -r9 ${KERNEL_NAME}-${DEVICE_CODENAME}-${DATE}.zip *
-    cd ..
+# Set environment for directory
+KERNEL_DIR=$PWD
+
+# Set enviroment for naming kernel
+MODEL="POCO X3 Pro"
+DEVICE="VAYU"
+KERNEL="Chizuru"
+KERNELTYPE="4.14"
+TYPE="nightly"
+
+# Get defconfig file
+DEFCONFIG=vayu_defconfig
+
+# Get branch name
+CI_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+export CI_BRANCH
+
+# Set environment for etc.
+export ARCH=arm64
+export SUBARCH=arm64
+export KBUILD_BUILD_USER="renaldigp"
+
+#
+# Set if do you use GCC or clang compiler
+# Default is clang compiler
+#
+COMPILER=clang
+
+# Set environment for telegram
+export CHATID="-1001547996542"
+export token="1906438800:AAFmyXCziDkt-1xn_ImWJ7Qr8AevNwn3hJw"
+export BOT_MSG_URL="https://api.telegram.org/bot$token/sendMessage"
+export BOT_BUILD_URL="https://api.telegram.org/bot$token/sendDocument"
+
+# Get distro name
+DISTRO=$(cat /etc/issue)
+
+# Get all cores of CPU
+PROCS=$(nproc --all)
+export PROCS
+
+# Check for CI
+if [[ -n "$CI" ]]; then
+	if [[ -n "$CIRCLECI" ]]; then
+		export KBUILD_BUILD_VERSION=$CIRCLE_BUILD_NUM
+		export KBUILD_BUILD_HOST="CircleCI"
+		export CI_BRANCH=$CIRCLE_BRANCH
+	else
+		export KBUILD_BUILD_HOST="rex"
+	fi
+fi
+
+# Check kernel version
+KERVER=$(make kernelversion)
+
+# Get last commit
+COMMIT_HEAD=$(git log --oneline -1)
+
+# Set Date 
+DATE=$(TZ=Asia/Jakarta date +"%Y%m%d-%T")
+
+# Set function for cloning repository
+clone() {
+	echo " "
+	if [[ $COMPILER == "clang" ]]; then
+		# Clone Proton clang
+		git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
+		# Set environment for clang
+		TC_DIR=$KERNEL_DIR/clang
+		# Get path and compiler string
+		KBUILD_COMPILER_STRING=$("$TC_DIR"/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g' -e 's/[[:space:]]*$//')
+		PATH=$TC_DIR/bin/:$PATH
+		export LD_LIBRARY_PATH=$TC_DIR/bin/:$LD_LIBRARY_PATH
+	elif [[ $COMPILER == "gcc" ]]; then
+		# Clone GCC ARM64 and ARM32
+		git clone --depth=1 https://github.com/arter97/arm64-gcc.git gcc64
+		git clone --depth=1 https://github.com/arter97/arm32-gcc.git gcc32
+		# Set environment for GCC ARM64 and ARM32
+		GCC64_DIR=$KERNEL_DIR/gcc64
+		GCC32_DIR=$KERNEL_DIR/gcc32
+		# Get path and compiler string
+		KBUILD_COMPILER_STRING=$("$GCC64_DIR"/bin/aarch64-elf-gcc --version | head -n 1)
+		PATH=$GCC64_DIR/bin/:$GCC32_DIR/bin/:/usr/bin:$PATH
+	fi
+
+	export PATH KBUILD_COMPILER_STRING
 }
-check
-compile
-zipping
-END=$(date +"%s")
-DIFF=$(($END - $START))
-push
+
+# Set function for telegram
+tg_post_msg() {
+	curl -s -X POST "$BOT_MSG_URL" -d chat_id="$2" \
+	-d "disable_web_page_preview=true" \
+	-d "parse_mode=html" \
+	-d text="$1"
+}
+
+tg_post_build() {
+	# Post MD5 Checksum alongwith for easeness
+	MD5CHECK=$(md5sum "$1" | cut -d' ' -f1)
+
+	# Show the Checksum alongwith caption
+	curl --progress-bar -F document=@"$1" "$BOT_BUILD_URL" \
+	-F chat_id="$2"  \
+	-F "disable_web_page_preview=true" \
+	-F "parse_mode=html" \
+	-F caption="$3 | <b>MD5 Checksum : </b><code>$MD5CHECK</code>"  
+}
+
+# Set function for naming zip file
+setversioning() {
+    KERNELNAME="$KERNEL-$DEVICE-$KERNELTYPE-$TYPE-$DATE"
+    export KERNELTYPE KERNELNAME
+    export ZIPNAME="$KERNELNAME.zip"
+}
+
+# Set function for starting compile
+build_kernel() {
+	echo -e "Kernel compilation starting"
+
+	tg_post_msg "<b>Device : </b><code>$MODEL [$DEVICE]</code>%0A<b>Branch : </b><code>$CI_BRANCH</code>%0A<b>Type : </b><code>$TYPE</code>%0A<b>Kernel Version : </b><code>$KERVER</code>%0A<b>Date : </b><code>$(TZ=Asia/Jakarta date)</code>%0A<b>Compiler Used : </b><code>$KBUILD_COMPILER_STRING</code>%0a<b>Last Commit : </b><code>$COMMIT_HEAD</code>%0A" "$CHATID"
+
+	make O=out $DEFCONFIG
+
+	BUILD_START=$(date +"%s")
+
+	if [[ $COMPILER == "clang" ]]; then
+		make -j"$PROCS" O=out \
+				CC=clang \
+				LD=ld.lld \
+				ARCH=arm64 \
+				AR=llvm-ar \
+				NM=llvm-nm \
+				OBJCOPY=llvm-objcopy \
+				OBJDUMP=llvm-objdump \
+				STRIP=llvm-strip \
+				CLANG_TRIPLE=aarch64-linux-gnu- \
+				CROSS_COMPILE=aarch64-linux-gnu- \
+				CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+	elif [[ $COMPILER == "gcc" ]]; then
+		export CROSS_COMPILE_ARM32=$GCC32_DIR/bin/arm-eabi-
+		make -j"$PROCS" O=out CROSS_COMPILE=aarch64-elf-
+	fi
+
+	BUILD_END=$(date +"%s")
+	DIFF=$((BUILD_END - BUILD_START))
+
+	if [[ -f "$KERNEL_DIR"/out/arch/arm64/boot/Image.gz ]]; then
+		echo -e "Kernel successfully compiled"
+	elif ! [[ -f "$IMG" || -f "$DTBO" ]]; then
+		echo -e "Kernel compilation failed"
+		tg_post_msg "<b>Build failed to compile after $((DIFF / 60)) minute(s) and $((DIFF % 60)) seconds</b>" "$CHATID" 
+		exit 1
+	fi
+}
+
+# Set function for zipping into a flashable zip
+gen_zip() {
+	mv "$KERNEL_DIR"/out/arch/arm64/boot/Image.gz AnyKernel3/Image.gz
+	mv "$KERNEL_DIR"/out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
+	find ${DTB} -name "*.dtb" -exec cat {} + > AnyKernel3/dtb
+	cd AnyKernel3 || exit
+	zip -r9 "$ZIPNAME" * -x .git README.md
+
+	# Prepare a final zip variable
+	ZIP_FINAL="$ZIPNAME"
+
+	tg_post_build "$ZIP_FINAL" "$CHATID" "Build took : $((DIFF / 60)) minute(s) and $((DIFF % 60)) second(s)"
+	cd ..
+}
+
+setversioning
+clone
+build_kernel
+gen_zip
